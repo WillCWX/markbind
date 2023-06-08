@@ -22,7 +22,7 @@ function init(root, options) {
       logger.info('Initialization success.');
     })
     .then(() => {
-      if (options.convert) {
+      if (options.template === 'default') {
         logger.info('Converting to MarkBind website.');
         const outputRoot = path.join(rootFolder, '_site');
         new Site(rootFolder, outputRoot).convert()

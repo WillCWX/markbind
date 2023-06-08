@@ -30,14 +30,11 @@
 <body data-bs-spy="scroll" data-bs-target="#mb-page-nav" data-bs-offset="100">
   <div id="app">
     <header sticky>
-      <navbar type="dark">
-        <template #brand><a href="/index.html" title="Home" class="navbar-brand">Your Logo</a></template>
-        <li><a href="/contents/topic1.html" class="nav-link">Topic 1</a></li>
-        <li><a href="/contents/topic2.html" class="nav-link">Topic 2</a></li>
-        <dropdown class="nav-link"><template #header>Topic 3</template>
-          <li><a href="/contents/topic3a.html" class="dropdown-item">Topic 3a</a></li>
-          <li><a href="/contents/topic3b.html" class="dropdown-item">Topic 3b</a></li>
-        </dropdown>
+      <navbar placement="top" type="dark">
+        <template #brand><a href="/index.html" title="Home" class="navbar-brand">
+            <i class="far fa-file-image"></i></a></template>
+        <li><a href="/index.html" class="nav-link">HOME</a></li>
+        <li><a href="/about.html" class="nav-link">ABOUT</a></li>
         <template #right>
           <li>
             <form class="navbar-form">
@@ -56,7 +53,7 @@
           <site-nav>
             <overlay-source class="site-nav-list site-nav-list-root" tag-name="ul" to="mb-site-nav">
               <li>
-                <div class="site-nav-default-list-item site-nav-list-item-0" onclick="handleSiteNavClick(this)"><a href="/index.html">Home 🏠</a></div>
+                <div class="site-nav-default-list-item site-nav-list-item-0" onclick="handleSiteNavClick(this)"><a href="/404.html">404</a></div>
               </li>
               <li>
                 <div class="site-nav-default-list-item site-nav-list-item-0" onclick="handleSiteNavClick(this)"><a href="/contents/topic1.html">Topic 1</a></div>
@@ -65,20 +62,13 @@
                 <div class="site-nav-default-list-item site-nav-list-item-0" onclick="handleSiteNavClick(this)"><a href="/contents/topic2.html">Topic 2</a></div>
               </li>
               <li>
-                <div class="site-nav-default-list-item site-nav-list-item-0" onclick="handleSiteNavClick(this)">Topic 3
-
-                  <div class="site-nav-dropdown-btn-container"><i class="site-nav-dropdown-btn-icon site-nav-rotate-icon" onclick="handleSiteNavClick(this.parentNode.parentNode, false); event.stopPropagation();">
-                      <span class="glyphicon glyphicon-menu-down" aria-hidden="true"></span>
-                    </i></div>
-                </div>
-                <ul class="site-nav-dropdown-container site-nav-dropdown-container-open site-nav-list">
-                  <li>
-                    <div class="site-nav-default-list-item site-nav-list-item-1" onclick="handleSiteNavClick(this)"><a href="/contents/topic3a.html">Topic 3a</a></div>
-                  </li>
-                  <li>
-                    <div class="site-nav-default-list-item site-nav-list-item-1" onclick="handleSiteNavClick(this)"><a href="/contents/topic3b.html">Topic 3b</a></div>
-                  </li>
-                </ul>
+                <div class="site-nav-default-list-item site-nav-list-item-0" onclick="handleSiteNavClick(this)"><a href="/contents/topic3a.html">Topic 3 A</a></div>
+              </li>
+              <li>
+                <div class="site-nav-default-list-item site-nav-list-item-0" onclick="handleSiteNavClick(this)"><a href="/contents/topic3b.html">Topic 3 B</a></div>
+              </li>
+              <li>
+                <div class="site-nav-default-list-item site-nav-list-item-0" onclick="handleSiteNavClick(this)"><a href="/index.html">Index</a></div>
               </li>
             </overlay-source>
           </site-nav>
