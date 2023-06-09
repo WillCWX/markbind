@@ -66,10 +66,15 @@ function stripBaseUrl(src: string, baseUrl: string) {
     : src;
 }
 
+const replaceInvalidWebChars = (relativePagePath: string) => (
+  relativePagePath.replace(/ /g, '%20')
+);
+
 export {
   getParentSiteAbsolutePath,
   getParentSiteAbsoluteAndRelativePaths,
   calculateBoilerplateFilePath,
   isUrl,
+  replaceInvalidWebChars,
   stripBaseUrl,
 };

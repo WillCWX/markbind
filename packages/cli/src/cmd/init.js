@@ -22,12 +22,21 @@ function init(root, options) {
       logger.info('Initialization success.');
     })
     .then(() => {
-      if (options.template === 'default') {
+      const outputRoot = path.join(rootFolder, '_site');
+      if (options.convert) {
         logger.info('Converting to MarkBind website.');
-        const outputRoot = path.join(rootFolder, '_site');
         new Site(rootFolder, outputRoot).convert()
           .then(() => {
             logger.info('Conversion success.');
+          })
+          .catch((error) => {
+            logger.error(error.message);
+            process.exitCode = 1;
+          });
+      } else if (options.template === 'default') {
+        new Site(rootFolder, outputRoot).buildTemplate()
+          .then(() => {
+            logger.info('Build template layout success.');
           })
           .catch((error) => {
             logger.error(error.message);

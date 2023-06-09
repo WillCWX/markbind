@@ -39,10 +39,6 @@ export const setExtension = (normalizedFilename: string, ext: string) => (
   removeExtension(normalizedFilename) + ext
 );
 
-export const replaceInvalidWebChars = (relativePagePath: string) => (
-  relativePagePath.replace(/ /g, '%20')
-);
-
 export function copySyncWithOptions(src: string, dest: string, options: CopyOptions) {
   const files = fs.readdirSync(src);
   files.forEach((file) => {

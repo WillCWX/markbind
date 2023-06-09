@@ -65,7 +65,7 @@ testTemplateSites.forEach((templateAndSitePath) => {
     compare(sitePath, 'expected', 'tmp/_site');
   } catch (err) {
     printFailedMessage(err, sitePath);
-    // fs.removeSync(path.resolve(__dirname, siteCreationTempPath));
+    fs.removeSync(path.resolve(__dirname, siteCreationTempPath));
     process.exit(1);
   }
   fs.removeSync(path.resolve(__dirname, siteCreationTempPath));

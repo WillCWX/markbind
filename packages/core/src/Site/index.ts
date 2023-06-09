@@ -34,12 +34,15 @@ import { sequentialAsyncForEach } from '../utils/async';
 import { delay } from '../utils/delay';
 import * as fsUtil from '../utils/fsUtil';
 import * as gitUtil from '../utils/git';
+import * as urlUtil from '../utils/urlUtil';
 import * as logger from '../utils/logger';
 import { SITE_CONFIG_NAME, INDEX_MARKDOWN_FILE, LAZY_LOADING_SITE_FILE_NAME } from './constants';
 
 require('../patches/htmlparser2');
 const ProgressBar = require('../lib/progress');
-const { LAYOUT_FOLDER_PATH, LAYOUT_DEFAULT_NAME, LayoutManager } = require('../Layout');
+const {
+  LAYOUT_FOLDER_PATH, LAYOUT_DEFAULT_NAME, LAYOUT_404_DEFAULT_NAME, LayoutManager,
+} = require('../Layout');
 
 const _ = {
   difference,
@@ -391,6 +394,17 @@ export class Site {
   }
 
   /**
+   * Builds the template layout to keep templates consistant with conversion.
+   */
+  async buildTemplate() {
+    await this.readSiteConfig();
+    this.collectAddressablePages();
+    this.addDefaultLayoutFiles();
+    await this.addDefaultLayoutToSiteConfig();
+    Site.printBaseUrlMessage();
+  }
+
+  /**
    * Copies over README.md or Home.md to default index.md if present.
    */
   async addIndexPage() {
@@ -422,7 +436,7 @@ export class Site {
   }
 
   /**
-   * Adds a footer to default layout of site.
+   * Creates a default layout file from exisitng files and adds it to the layout folder.
    */
   addDefaultLayoutFiles() {
     const wikiFooterPath = path.join(this.rootPath, WIKI_FOOTER_PATH);
@@ -458,6 +472,8 @@ export class Site {
    * Builds a site navigation file from the directory structure of the site.
    */
   buildSiteNav() {
+    const priorityFiles = ['README', 'Home', 'Index'];
+    const ignoreFiles = ['404', 'About', 'about'];
     let siteNavContent = '';
     this.addressablePages
       .filter(addressablePage => !addressablePage.src.startsWith('_'))
@@ -465,10 +481,14 @@ export class Site {
         const addressablePagePath = path.join(this.rootPath, page.src);
         const relativePagePathWithoutExt = fsUtil.removeExtensionPosix(
           path.relative(this.rootPath, addressablePagePath));
-        const validRelativePagePathWithoutExt = fsUtil.replaceInvalidWebChars(relativePagePathWithoutExt);
+        const validRelativePagePathWithoutExt = urlUtil.replaceInvalidWebChars(relativePagePathWithoutExt);
         const pageName = _.startCase(fsUtil.removeExtension(path.basename(addressablePagePath)));
         const pageUrl = `{{ baseUrl }}/${validRelativePagePathWithoutExt}.html`;
-        siteNavContent += `* [${pageName}](${pageUrl})\n`;
+        if (priorityFiles.includes(pageName)) {
+          siteNavContent = `* [${pageName}](${pageUrl})\n${siteNavContent}`;
+        } else if (!ignoreFiles.includes(pageName)) {
+          siteNavContent += `* [${pageName}](${pageUrl})\n`;
+        }
       });
 
     return siteNavContent.trimEnd();
@@ -487,8 +507,10 @@ export class Site {
    * Helper function for addDefaultLayoutToSiteConfig().
    */
   static async writeToSiteConfig(config: SiteConfig, configPath: string) {
-    const layoutObj: SiteConfigPage = { glob: '**/*.md', layout: LAYOUT_DEFAULT_NAME };
-    config.pages.push(layoutObj);
+    const defaultLayoutObj: SiteConfigPage = { glob: '**/*.md', layout: LAYOUT_DEFAULT_NAME };
+    const notFoundLayoutObj: SiteConfigPage = { glob: '404.md', layout: LAYOUT_404_DEFAULT_NAME };
+    config.pages.push(defaultLayoutObj);
+    config.pages.push(notFoundLayoutObj);
     await fs.outputJson(configPath, config);
   }
 
