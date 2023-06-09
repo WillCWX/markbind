@@ -465,8 +465,9 @@ export class Site {
         const addressablePagePath = path.join(this.rootPath, page.src);
         const relativePagePathWithoutExt = fsUtil.removeExtensionPosix(
           path.relative(this.rootPath, addressablePagePath));
+        const validRelativePagePathWithoutExt = fsUtil.replaceInvalidWebChars(relativePagePathWithoutExt);
         const pageName = _.startCase(fsUtil.removeExtension(path.basename(addressablePagePath)));
-        const pageUrl = `{{ baseUrl }}/${relativePagePathWithoutExt}.html`;
+        const pageUrl = `{{ baseUrl }}/${validRelativePagePathWithoutExt}.html`;
         siteNavContent += `* [${pageName}](${pageUrl})\n`;
       });
 
