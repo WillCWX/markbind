@@ -3,7 +3,7 @@ import fs from 'fs-extra';
 import ghpages from 'gh-pages';
 import ignore, { Ignore } from 'ignore';
 import path from 'path';
-import Bluebird from 'bluebird'; // TODO rename promise
+import Bluebird from 'bluebird';
 import walkSync from 'walk-sync';
 import simpleGit, { SimpleGit } from 'simple-git';
 
@@ -124,7 +124,7 @@ const ABOUT_MARKDOWN_DEFAULT = '# About\n'
 const MARKBIND_WEBSITE_URL = 'https://markbind.org/';
 const MARKBIND_LINK_HTML = `<a href='${MARKBIND_WEBSITE_URL}'>MarkBind ${MARKBIND_VERSION}</a>`;
 
-// Types begin
+// --- Types begin ---
 type PageCreationConfig = {
   externalScripts: string[],
   frontmatter: FrontMatter,
@@ -166,11 +166,10 @@ type DeployOptions = {
   remote: string,
   user?: { name: string; email: string; },
 };
-
-// Types End
+// --- Types End ---
 
 export class Site {
-  // Properties begin
+  // --- Properties begin ---
   dev: boolean;
   rootPath: string;
   outputPath: string;
@@ -201,9 +200,7 @@ export class Site {
   rebuildSourceFiles?: (this: any, arg: unknown) => Bluebird<unknown>;
   // TODO: add LayoutManager when it has been migrated
   layoutManager: any;
-  // Properties end
-
-  // Functions begin
+  // --- Properties end ---
 
   constructor(rootPath: string, outputPath: string, onePagePath: string, forceReload = false,
               siteConfigPath = SITE_CONFIG_NAME, dev: any, backgroundBuildMode: boolean,
@@ -1710,8 +1707,8 @@ export class Site {
   }
 
   /**
- * Methods not yet implemented
- */
+  * Methods not yet implemented
+  */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars, class-methods-use-this
   async rebuildPagesBeingViewed(_currentPageViewed: string) {
     throw new Error('Method not implemented.');
