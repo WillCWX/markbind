@@ -1544,7 +1544,7 @@ export class Site {
     const publish = Bluebird.promisify(ghpages.publish);
     await this.readSiteConfig();
     const depOptions = await this.getDepOptions(ciTokenVar, defaultDeployConfig, publish);
-    return Site.getDepUrl(depOptions, defaultDeployConfig);
+    return Site.getDepUrl(depOptions);
   }
 
   /**
@@ -1561,7 +1561,7 @@ export class Site {
       branch: this.siteConfig.deploy.branch || defaultDeployConfig.branch,
       message: this.siteConfig.deploy.message || defaultDeployConfig.message,
       repo: this.siteConfig.deploy.repo || defaultDeployConfig.repo,
-      remote: '',
+      remote: defaultDeployConfig.remote,
     };
     options.message = options.message.concat(' [skip ci]');
 
@@ -1636,9 +1636,8 @@ export class Site {
   /**
    * Helper function for deploy().
    */
-  static getDepUrl(options: DeployOptions, defaultDeployConfig: DeployOptions) {
+  static getDepUrl(options: DeployOptions) {
     const git = simpleGit({ baseDir: process.cwd() });
-    options.remote = defaultDeployConfig.remote;
     return Site.getDeploymentUrl(git, options);
   }
 
