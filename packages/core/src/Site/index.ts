@@ -1,12 +1,11 @@
 import cheerio from 'cheerio';
 import fs from 'fs-extra';
-import ghpages from 'gh-pages';
 import ignore, { Ignore } from 'ignore';
 import path from 'path';
-import Bluebird from 'bluebird';
 import walkSync from 'walk-sync';
 import simpleGit, { SimpleGit } from 'simple-git';
-
+import Bluebird from 'bluebird';
+import ghpages from 'gh-pages';
 import difference from 'lodash/difference';
 import differenceWith from 'lodash/differenceWith';
 import flatMap from 'lodash/flatMap';
@@ -15,7 +14,6 @@ import isBoolean from 'lodash/isBoolean';
 import isEmpty from 'lodash/isEmpty';
 import isEqual from 'lodash/isEqual';
 import isUndefined from 'lodash/isUndefined';
-import isError from 'lodash/isError';
 import noop from 'lodash/noop';
 import omitBy from 'lodash/omitBy';
 import startCase from 'lodash/startCase';
@@ -31,25 +29,28 @@ import { VariableRenderer } from '../variables/VariableRenderer';
 import { ExternalManager, ExternalManagerConfig } from '../External/ExternalManager';
 import { SiteLinkManager } from '../html/SiteLinkManager';
 import { PluginManager } from '../plugins/PluginManager';
-
+import type { FrontMatter } from '../plugins/Plugin';
 import { sequentialAsyncForEach } from '../utils/async';
 import { delay } from '../utils/delay';
 import * as fsUtil from '../utils/fsUtil';
 import * as gitUtil from '../utils/git';
 import * as logger from '../utils/logger';
 import { SITE_CONFIG_NAME, INDEX_MARKDOWN_FILE, LAZY_LOADING_SITE_FILE_NAME } from './constants';
-import { FrontMatter } from '../plugins/Plugin';
+
+// Change when they are migrated to TypeScript
+const ProgressBar = require('../lib/progress');
+const { LayoutManager, LAYOUT_DEFAULT_NAME, LAYOUT_FOLDER_PATH } = require('../Layout');
+require('../patches/htmlparser2');
 
 const _ = {
   difference,
   differenceWith,
   flatMap,
   has,
-  isBoolean,
-  isEmpty,
-  isEqual,
   isUndefined,
-  isError,
+  isEqual,
+  isEmpty,
+  isBoolean,
   noop,
   omitBy,
   startCase,
@@ -57,16 +58,11 @@ const _ = {
   uniq,
 };
 
-// Change when they are migrated to TypeScript
-const ProgressBar = require('../lib/progress');
-const { LayoutManager, LAYOUT_DEFAULT_NAME, LAYOUT_FOLDER_PATH } = require('../Layout');
-require('../patches/htmlparser2');
-
-const MARKBIND_VERSION = require('../../package.json').version;
-
 const url = {
   join: path.posix.join,
 };
+
+const MARKBIND_VERSION = require('../../package.json').version;
 
 const CONFIG_FOLDER_NAME = '_markbind';
 const SITE_FOLDER_NAME = '_site';
@@ -124,7 +120,9 @@ const ABOUT_MARKDOWN_DEFAULT = '# About\n'
 const MARKBIND_WEBSITE_URL = 'https://markbind.org/';
 const MARKBIND_LINK_HTML = `<a href='${MARKBIND_WEBSITE_URL}'>MarkBind ${MARKBIND_VERSION}</a>`;
 
-// --- Types begin ---
+/*
+ * A page configuration object.
+ */
 type PageCreationConfig = {
   externalScripts: string[],
   frontmatter: FrontMatter,
@@ -166,10 +164,8 @@ type DeployOptions = {
   remote: string,
   user?: { name: string; email: string; },
 };
-// --- Types End ---
 
 export class Site {
-  // --- Properties begin ---
   dev: boolean;
   rootPath: string;
   outputPath: string;
@@ -200,7 +196,6 @@ export class Site {
   rebuildSourceFiles?: (this: any, arg: unknown) => Bluebird<unknown>;
   // TODO: add LayoutManager when it has been migrated
   layoutManager: any;
-  // --- Properties end ---
 
   constructor(rootPath: string, outputPath: string, onePagePath: string, forceReload = false,
               siteConfigPath = SITE_CONFIG_NAME, dev: any, backgroundBuildMode: boolean,
@@ -248,8 +243,8 @@ export class Site {
     logger.warn(error);
     try {
       await Promise.all(removeFolders.map(folder => fs.remove(folder)));
-    } catch (err: any) {
-      logger.error(`Failed to remove generated files after error!\n${err.message}`);
+    } catch (err) {
+      logger.error(`Failed to remove generated files after error!\n${(err as Error).message}`);
     }
   }
 
@@ -283,7 +278,7 @@ export class Site {
 
   /**
    * Changes the list of current opened pages
-   * @param {Array<string>} normalizedUrls Collection of normalized url of pages taken from the clients
+   * @param normalizedUrls Collection of normalized url of pages taken from the clients
    * ordered from most-to-least recently opened
    */
   changeCurrentOpenedPages(normalizedUrls: string[]) {
@@ -308,7 +303,6 @@ export class Site {
    * Read and store the site config from site.json, overwrite the default base URL
    * if it's specified by the user.
    * @param baseUrl user defined base URL (if exists)
-   * @returns {Promise}
    */
   async readSiteConfig(baseUrl?: string): Promise<any> {
     try {
@@ -317,9 +311,9 @@ export class Site {
       this.siteConfig = new SiteConfig(siteConfigJson, baseUrl);
 
       return this.siteConfig;
-    } catch (err: any) {
+    } catch (err) {
       throw (new Error(`Failed to read the site config file '${this.siteConfigPath}' at`
-        + `${this.rootPath}:\n${err.message}\nPlease ensure the file exist or is valid`));
+        + `${this.rootPath}:\n${(err as Error).message}\nPlease ensure the file exist or is valid`));
     }
   }
 
@@ -329,21 +323,7 @@ export class Site {
   }
 
   /**
-   * A page configuration object.
-   * @typedef {Object<string, any>} PageCreationConfig
-   * @property {string} faviconUrl
-   * @property {string} pageSrc
-   * @property {string} title
-   * @property {string} layout
-   * @property {Object<string, any>} frontmatter
-   * @property {boolean} searchable
-   * @property {Array<string>} externalScripts
-   * /
-
-  /**
    * Create a Page object from the site and page creation config.
-   * @param {PageCreationConfig} config
-   * @returns {Page}
    */
   createPage(config: PageCreationConfig): Page {
     const sourcePath = path.join(this.rootPath, config.pageSrc);
@@ -507,7 +487,7 @@ export class Site {
    * Helper function for addDefaultLayoutToSiteConfig().
    */
   static async writeToSiteConfig(config: SiteConfig, configPath: string) {
-    const layoutObj = { glob: '**/*.md', layout: LAYOUT_DEFAULT_NAME };
+    const layoutObj: SiteConfigPage = { glob: '**/*.md', layout: LAYOUT_DEFAULT_NAME };
     config.pages.push(layoutObj);
     await fs.outputJson(configPath, config);
   }
@@ -565,7 +545,7 @@ export class Site {
                                          searchable: page.searchable,
                                          layout: page.layout,
                                          frontmatter: page.frontmatter,
-                                       })));
+                                       }))) as AddressablePage[];
     /*
      Add pages collected from globs and merge properties for pages
      Page properties collected from src have priority over page properties from globs,
@@ -587,7 +567,6 @@ export class Site {
 
   /**
    * Collects the base url map in the site/subsites
-   * @returns {*}
    */
   collectBaseUrl() {
     const candidates = walkSync(this.rootPath, { directories: false })
@@ -643,9 +622,9 @@ export class Site {
       let content;
       try {
         content = fs.readFileSync(userDefinedVariablesPath, 'utf8');
-      } catch (e: any) {
+      } catch (e) {
         content = '';
-        logger.warn(e.message);
+        logger.warn((e as Error).message);
       }
 
       /*
@@ -660,7 +639,7 @@ export class Site {
       this.variableProcessor.addUserDefinedVariable(base, 'MarkBind', MARKBIND_LINK_HTML);
 
       const $ = cheerio.load(content, { decodeEntities: false });
-      $('variable,span').each((index, element) => {
+      $('variable,span').each((_index, element) => {
         const name = $(element).attr('name') || $(element).attr('id');
 
         this.variableProcessor.renderAndAddUserDefinedVariable(base, name, $(element).html());
@@ -685,9 +664,8 @@ export class Site {
   /**
    * Generate the website.
    * @param baseUrl user defined base URL (if exists)
-   * @returns {Promise}
    */
-  async generate(baseUrl: string | undefined) {
+  async generate(baseUrl: string | undefined): Promise<any> {
     const startTime = new Date();
     // Create the .tmp folder for storing intermediate results.
     fs.emptydirSync(this.tempPath);
@@ -700,7 +678,7 @@ export class Site {
     try {
       await this.readSiteConfig(baseUrl);
       this.collectAddressablePages();
-      await this.collectBaseUrl();
+      this.collectBaseUrl();
       this.collectUserDefinedVariablesMap();
       await this.buildAssets();
       await (this.onePagePath ? this.lazyBuildSourceFiles() : this.buildSourceFiles());
@@ -712,7 +690,7 @@ export class Site {
       await this.writeSiteData();
       this.calculateBuildTimeForGenerate(startTime, lazyWebsiteGenerationString);
       if (this.backgroundBuildMode) {
-        this._backgroundBuildNotViewedFiles();
+        this.backgroundBuildNotViewedFiles();
       }
     } catch (error) {
       await Site.rejectHandler(error, [this.tempPath, this.outputPath]);
@@ -805,7 +783,7 @@ export class Site {
       await this.regenerateAffectedPages(uniquePaths);
       await fs.remove(this.tempPath);
       if (this.backgroundBuildMode) {
-        this._backgroundBuildNotViewedFiles();
+        this.backgroundBuildNotViewedFiles();
       }
     } catch (error) {
       await Site.rejectHandler(error, [this.tempPath, this.outputPath]);
@@ -862,9 +840,9 @@ export class Site {
 
   /**
    * Generates pages that are marked to be built/rebuilt.
-   * @returns {Promise<boolean>} A Promise that resolves once all pages are generated.
+   * @returns A Promise that resolves once all pages are generated.
    */
-  async generatePagesMarkedToRebuild() {
+  async generatePagesMarkedToRebuild(): Promise<boolean> {
     const pagesToRebuild = this.pages.filter((page) => {
       const normalizedUrl = fsUtil.removeExtension(page.pageConfig.sourcePath);
       return this.toRebuild.has(normalizedUrl);
@@ -892,7 +870,7 @@ export class Site {
       await this.removeAsset(removedPageFilePaths);
       await this.rebuildRequiredPages();
       if (this.backgroundBuildMode) {
-        this._backgroundBuildNotViewedFiles();
+        this.backgroundBuildNotViewedFiles();
       }
     } catch (error) {
       await Site.rejectHandler(error, [this.tempPath, this.outputPath]);
@@ -969,7 +947,7 @@ export class Site {
     await this.handlePageReload(oldAddressablePages, oldPagesSrc, oldSiteConfig);
     await this.handleStyleReload(oldSiteConfig.style);
     if (this.backgroundBuildMode) {
-      this._backgroundBuildNotViewedFiles();
+      this.backgroundBuildNotViewedFiles();
     }
   }
 
@@ -986,7 +964,7 @@ export class Site {
 
     const addedPages = _.differenceWith(this.addressablePages, oldAddressablePages, isNewPage);
     const removedPages = _.differenceWith(oldAddressablePages, this.addressablePages, isNewPage)
-      .map(filePath => fsUtil.setExtension(filePath.src, '.html'));
+      .map(filePath => fsUtil.setExtension(filePath.src as string, '.html'));
 
     // Checks if any attributes of site.json requiring a global rebuild are modified
     const isGlobalConfigModified = () => !_.isEqual(oldSiteConfig.faviconPath, this.siteConfig.faviconPath)
@@ -1011,12 +989,8 @@ export class Site {
       await this.writeSiteData();
     } else {
       // Get pages with edited attributes but with the same src
-      const editedPages = _.differenceWith(this.addressablePages, oldAddressablePages, (newPage, oldPage) => {
-        if (!_.isEqual(newPage, oldPage)) {
-          return !oldPagesSrc.includes(newPage.src);
-        }
-        return true;
-      });
+      const editedPages = _.differenceWith(this.addressablePages, oldAddressablePages, (newPage, oldPage) =>
+        _.isEqual(newPage, oldPage) || !oldPagesSrc.includes(newPage.src));
       this.updatePages(editedPages);
       const siteConfigDirectory = path.dirname(path.join(this.rootPath, this.siteConfigPath));
       this.regenerateAffectedPages(editedPages.map(page => path.join(siteConfigDirectory, page.src)));
@@ -1063,8 +1037,8 @@ export class Site {
 
   /**
    * Checks if a specified file path is a dependency of a page
-   * @param {string} filePath file path to check
-   * @returns {boolean} whether the file path is a dependency of any of the site's pages
+   * @param filePath file path to check
+   * @returns whether the file path is a dependency of any of the site's pages
    */
   isDependencyOfPage(filePath: string): boolean {
     return this.pages.some(page => page.isDependency(filePath))
@@ -1073,8 +1047,8 @@ export class Site {
 
   /**
    * Checks if a specified file path satisfies a src or glob in any of the page configurations.
-   * @param {string} filePath file path to check
-   * @returns {boolean} whether the file path is satisfies any glob
+   * @param filePath file path to check
+   * @returns whether the file path is satisfies any glob
    */
   isFilepathAPage(filePath: string): boolean {
     const { pages, pagesExclude } = this.siteConfig;
@@ -1107,8 +1081,6 @@ export class Site {
 
   /**
    * Maps an array of addressable pages to an array of Page object
-   * @param {Array<Page>} addressablePages
-   * @param {String} faviconUrl
    */
   mapAddressablePagesToPages(addressablePages: AddressablePage[], faviconUrl: string | undefined) {
     this.pages = addressablePages.map(page => this.createNewPage(page, faviconUrl));
@@ -1116,8 +1088,8 @@ export class Site {
 
   /**
    * Creates and returns a new Page with the given page config details and favicon url
-   * @param {Page} page config
-   * @param {String} faviconUrl of the page
+   * @param page config
+   * @param faviconUrl of the page
    */
   createNewPage(page: AddressablePage, faviconUrl: string | undefined) {
     return this.createPage({
@@ -1138,8 +1110,8 @@ export class Site {
   /**
    * Runs the supplied page generation tasks according to the specified mode of each task.
    * A page generation task can be a sequential generation or an asynchronous generation.
-   * @param {Array<object>} pageGenerationTasks Array of page generation tasks
-   * @returns {Promise<boolean>} A Promise that resolves to a boolean which indicates whether the generation
+   * @param pageGenerationTasks Array of page generation tasks
+   * @returns A Promise that resolves to a boolean which indicates whether the generation
    * ran to completion
    */
   async runPageGenerationTasks(pageGenerationTasks: PageGenerationTask[]): Promise<boolean> {
@@ -1173,9 +1145,9 @@ export class Site {
   /**
    * Generate pages sequentially. That is, the pages are generated
    * one-by-one in order.
-   * @param {Array<Page>} pages Pages to be generated
-   * @param {ProgressBar} progressBar Progress bar of the overall generation process
-   * @returns {Promise<boolean>} A Promise that resolves to a boolean which indicates whether the generation
+   * @param pages Pages to be generated
+   * @param progressBar Progress bar of the overall generation process
+   * @returns A Promise that resolves to a boolean which indicates whether the generation
    * ran to completion
    */
   async generatePagesSequential(pages: Page[], progressBar: any): Promise<boolean> {
@@ -1207,14 +1179,14 @@ export class Site {
   /**
    * Creates the supplied pages' page generation promises at a throttled rate.
    * This is done to avoid pushing too many callbacks into the event loop at once. (#1245)
-   * @param {Array<Page>} pages Pages to be generated
-   * @param {ProgressBar} progressBar Progress bar of the overall generation process
-   * @returns {Promise<boolean>} A Promise that resolves to a boolean which indicates whether the generation
+   * @param pages Pages to be generated
+   * @param progressBar Progress bar of the overall generation process
+   * @returns A Promise that resolves to a boolean which indicates whether the generation
    * ran to completion
    */
   generatePagesAsyncThrottled(pages: Page[], progressBar: any): Promise<boolean> {
     return new Promise((resolve, reject) => {
-      const context = {
+      const context: PageGenerationContext = {
         startTime: new Date(),
         numPagesGenerated: 0,
         numPagesToGenerate: pages.length,
@@ -1473,7 +1445,7 @@ export class Site {
 
   /**
    * Copies bootstrapTheme to the assets folder if a valid bootstrapTheme is specified
-   * @param {Boolean} isRebuild only true if it is a rebuild
+   * @param isRebuild only true if it is a rebuild
    */
   copyBootstrapTheme(isRebuild: boolean) {
     const { bootstrapTheme } = this.siteConfig.style;
@@ -1497,9 +1469,9 @@ export class Site {
 
   /**
    * Writes the site data to siteData.json
-   * @param {boolean} verbose Flag to emit logs of the operation
+   * @param verbose Flag to emit logs of the operation
    */
-  async writeSiteData(verbose = true) {
+  async writeSiteData(verbose: boolean = true) {
     const siteDataPath = path.join(this.outputPath, SITE_DATA_NAME);
     const siteData = {
       enableSearch: this.siteConfig.enableSearch,
@@ -1524,7 +1496,7 @@ export class Site {
   }
 
   deploy(ciTokenVar: string | boolean) {
-    const defaultDeployConfig = {
+    const defaultDeployConfig: DeployOptions = {
       branch: 'gh-pages',
       message: 'Site Update.',
       repo: '',
@@ -1537,7 +1509,7 @@ export class Site {
   /**
    * Helper function for deploy(). Returns the ghpages link where the repo will be hosted.
    */
-  async generateDepUrl(ciTokenVar: string | boolean, defaultDeployConfig: DeployOptions) {
+  async generateDepUrl(ciTokenVar: boolean | string, defaultDeployConfig: DeployOptions) {
     const publish = Bluebird.promisify(ghpages.publish);
     await this.readSiteConfig();
     const depOptions = await this.getDepOptions(ciTokenVar, defaultDeployConfig, publish);
@@ -1674,7 +1646,7 @@ export class Site {
     const promises = [cnamePromise, remoteUrlPromise];
 
     try {
-      const promiseResults = await Promise.all(promises) as string[];
+      const promiseResults: string[] = await Promise.all(promises) as string[];
       const generateGhPagesUrl = (results: string[]) => {
         const cname = results[0];
         const remoteUrl = results[1];
@@ -1706,9 +1678,6 @@ export class Site {
     this.variableProcessor.addUserDefinedVariableForAllSites('timestamp', time);
   }
 
-  /**
-  * Methods not yet implemented
-  */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars, class-methods-use-this
   async rebuildPagesBeingViewed(_currentPageViewed: string) {
     throw new Error('Method not implemented.');
